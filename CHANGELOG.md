@@ -14,6 +14,11 @@ So wird ein Abschnitt geschrieben (für Mitwirkende):
 
 ## [Unveröffentlicht]
 
+### Neu
+- **Datenbank: mehrere Zeilen markieren und löschen.** Vor jeder Zeile gibt es ein Häkchen, oben eins für „alle auf dieser Seite“, mit Shift-Klick markierst du ganze Bereiche. Dann „Zeilen löschen“ oder die Entf-Taste – nach einer Rückfrage wird alles zusammen gelöscht. Klappt es bei einer Zeile nicht, wird gar nichts gelöscht.
+- **Datenbank: Tabelle leeren.** Der Knopf „Leeren“ löscht alle Zeilen einer Tabelle. Zur Sicherheit tippst du den Tabellennamen ein; auf Wunsch fangen die IDs danach wieder bei 1 an. Verweisen andere Tabellen darauf, zeigt die App das vorher deutlich an.
+- Verständliche Meldung, wenn eine Zeile noch von einer anderen Tabelle gebraucht wird.
+
 ## 1.7.0 – 2026-11-05
 
 ### Neu

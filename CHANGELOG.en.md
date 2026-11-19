@@ -14,6 +14,11 @@ How to write a section (for contributors):
 
 ## [Unreleased]
 
+### New
+- **Database: select and delete several rows.** Each row has a checkbox, the header one selects the whole page, Shift-click selects ranges. Then “Delete rows” or the Delete key – after a confirmation everything is deleted together. If one row fails, nothing is deleted.
+- **Database: empty a table.** The “Empty” button deletes all rows of a table. For safety you type the table name; optionally the IDs start at 1 again. If other tables refer to it, the app shows that clearly first.
+- A clear message when a row is still used by another table.
+
 ## 1.7.0 – 2026-11-05
 
 ### New

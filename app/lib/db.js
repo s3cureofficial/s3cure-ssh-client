@@ -1,7 +1,8 @@
 // Datenbank-Ansicht (PostgreSQL) durch die SSH-Verbindung: ein lokaler Port auf 127.0.0.1 leitet
 // über forwardOut zum Datenbank-Server weiter (wie ein Tunnel) – Postgres muss nicht offen im Netz sein.
 // Tabellen anzeigen, blättern, sortieren, suchen; Zellen ändern und Zeilen löschen nur über den
-// Primärschlüssel und nur, wenn genau eine Zeile betroffen ist; SQL ausführen; CSV-Export.
+// Primärschlüssel und nur, wenn genau eine Zeile betroffen ist (mehrere Zeilen: alle oder keine);
+// ganze Tabelle leeren (TRUNCATE); SQL ausführen; CSV-Export.
 // Zugangsdaten pro Verbindung in db-connections.json, Passwörter verschlüsselt (secrets).
 // Oberfläche: src/db-view.js
 const fs = require('fs');
@@ -14,6 +15,7 @@ const { findCmd } = require('./env-files');
 const MAX_ROWS = 2000;      // höchstens so viele Zeilen an die Oberfläche
 const MAX_CELL = 20000;     // lange Texte kürzen
 const COUNT_CAP = 100000;   // ab hier nur „100.000+“
+const MAX_DELETE = 1000;    // so viele markierte Zeilen auf einmal löschen
 
 const qi = s => '"' + String(s).replace(/"/g, '""') + '"'; // Bezeichner sicher in Anführungszeichen
 
@@ -78,10 +80,12 @@ function isReadOnly(sql) {
 }
 
 function friendly(err) {
+  if (err && err.code === '0A000' && /truncate/i.test(err.message)) return t('db.errTruncateRefs');
   const c = err && err.code;
   if (c === '28P01' || c === '28000') return t('db.errAuth');
   if (c === '3D000') return t('db.errNoDb');
   if (c === '42501') return t('db.errPermission', { error: err.message });
+  if (c === '23503') return t('db.errReferenced', { detail: err.detail || err.message });
   if (/refused|ECONNREFUSED/i.test(String(err && err.message))) return t('db.errRefused');
   return String((err && err.message) || err);
 }
@@ -227,6 +231,56 @@ function register({ ipcMain, sessions, secrets, configDir, dialog, getWin }) {
     const c = conn(tabId).client;
     if (!Array.isArray(o.pk) || !o.pk.length) throw new Error(t('db.errNoPk'));
     await oneRow(c, `delete from ${qi(o.schema)}.${qi(o.table)} where ${pkWhere(o.pk, 1)}`, o.pkValues);
+    return true;
+  }));
+
+  // Mehrere Zeilen löschen (markiert): { schema, table, pk, keys: [[pk-Werte], …] }
+  // Alles in einer Transaktion – trifft eine Zeile nicht genau einen Datensatz, wird nichts gelöscht.
+  ipcMain.handle('db:deleteMany', wrap(async (_e, tabId, o = {}) => {
+    const c = conn(tabId).client;
+    if (!Array.isArray(o.pk) || !o.pk.length) throw new Error(t('db.errNoPk'));
+    const keys = Array.isArray(o.keys) ? o.keys : [];
+    if (!keys.length) return 0;
+    if (keys.length > MAX_DELETE) throw new Error(t('db.errTooMany', { n: MAX_DELETE }));
+    if (keys.some(k => !Array.isArray(k) || k.length !== o.pk.length)) throw new Error(t('db.errNoPk'));
+    return deleteKeys(c, `delete from ${qi(o.schema)}.${qi(o.table)} where ${pkWhere(o.pk, 1)}`, keys);
+  }));
+
+  async function deleteKeys(c, sql, keys) {
+    await c.query('begin');
+    try {
+      for (const k of keys) {
+        const r = await c.query(sql, k);
+        if (r.rowCount !== 1) throw new Error(t('db.errRowCount', { n: r.rowCount }));
+      }
+      await c.query('commit');
+      return keys.length;
+    } catch (err) { await c.query('rollback').catch(() => {}); throw err; }
+  }
+
+  // Vor dem Leeren: genaue Zeilenzahl (bis zur Grenze) und welche anderen Tabellen darauf verweisen
+  ipcMain.handle('db:truncateInfo', wrap(async (_e, tabId, o = {}) => {
+    const c = conn(tabId).client;
+    const rel = `${qi(o.schema)}.${qi(o.table)}`;
+    const kind = (await c.query(`select c.relkind from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = $1 and c.relname = $2`, [o.schema, o.table])).rows[0];
+    if (!kind || !['r', 'p'].includes(kind.relkind)) throw new Error(t('db.errNotTable'));
+    const count = await c.query(`select count(*)::int as n from (select 1 from ${rel} limit ${COUNT_CAP + 1}) x`);
+    const refs = await c.query(`select distinct n.nspname as schema, cl.relname as name from pg_constraint co
+      join pg_class cl on cl.oid = co.conrelid join pg_namespace n on n.oid = cl.relnamespace
+      where co.contype = 'f' and co.confrelid = (quote_ident($1) || '.' || quote_ident($2))::regclass and co.conrelid <> co.confrelid
+      order by 1, 2`, [o.schema, o.table]);
+    const seq = await c.query(`select count(*)::int as n from pg_depend d join pg_class s on s.oid = d.objid and s.relkind = 'S'
+      where d.refobjid = (quote_ident($1) || '.' || quote_ident($2))::regclass and d.deptype in ('a', 'i')`, [o.schema, o.table]);
+    return { rows: count.rows[0].n, capped: count.rows[0].n > COUNT_CAP, refs: refs.rows.map(x => (x.schema === 'public' ? x.name : `${x.schema}.${x.name}`)), hasSequence: seq.rows[0].n > 0 };
+  }));
+
+  // Tabelle leeren: { schema, table, confirm (Tabellenname), cascade, restartIdentity }
+  ipcMain.handle('db:truncate', wrap(async (_e, tabId, o = {}) => {
+    const c = conn(tabId).client;
+    if (String(o.confirm || '') !== String(o.table)) throw new Error(t('db.errConfirmName'));
+    const sql = `truncate table ${qi(o.schema)}.${qi(o.table)}${o.restartIdentity ? ' restart identity' : ''}${o.cascade ? ' cascade' : ''}`;
+    await c.query('begin');
+    try { await c.query(sql); await c.query('commit'); } catch (err) { await c.query('rollback').catch(() => {}); throw err; }
     return true;
   }));
 

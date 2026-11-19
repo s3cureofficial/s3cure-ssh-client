@@ -1,6 +1,8 @@
 // Ansicht „Datenbank“: PostgreSQL des Servers durch die SSH-Verbindung (Hauptprozess: lib/db.js).
 // Tabellen ansehen, blättern, sortieren, suchen; Zelle ändern (Doppelklick) und Zeile löschen
-// (Rechtsklick) nur mit Rückfrage und nur bei Tabellen mit Primärschlüssel; SQL ausführen; CSV-Export.
+// (Rechtsklick) nur mit Rückfrage und nur bei Tabellen mit Primärschlüssel; mehrere Zeilen markieren
+// (Häkchen, Shift-Klick für Bereiche) und zusammen löschen; Tabelle leeren (Name eintippen);
+// SQL ausführen; CSV-Export.
 // Eingehängt in renderer.js: DbView.update(tab) (updateToolbar) und DbView.detach(tab) (disposeTab).
 window.DbView = (() => {
   const states = new Map(); // Tab-ID -> Zustand
@@ -75,6 +77,13 @@ window.DbView = (() => {
                 <button class="mini-btn" data-p="next">${icon('down')}</button>
               </div>
               <button class="mini-btn" data-a="reload" title="${t('db.reload')}">${icon('refresh')}</button>
+              <button class="btn ghost small dbv-truncate" data-a="truncate" title="${t('db.truncateTitleBtn')}" hidden>${icon('trash')}<span>${t('db.truncate')}</span></button>
+            </div>
+            <div class="dbv-selbar" hidden>
+              <span class="dbv-seln"></span>
+              <span class="spacer"></span>
+              <button class="btn ghost small" data-a="clearsel">${t('db.clearSel')}</button>
+              <button class="btn danger small" data-a="delsel">${icon('trash')}<span></span></button>
             </div>
             <div class="dbv-gridwrap"></div>
             <div class="dbv-foot"></div>
@@ -93,7 +102,7 @@ window.DbView = (() => {
         </div>
       </div>`;
     document.getElementById('terminals').appendChild(root);
-    const st = { tab, root, conn: null, mode: 'tables', tables: [], tfilter: '', cur: null, data: null, sqlResult: null, busy: false, lastInfo: undefined };
+    const st = { tab, root, conn: null, mode: 'tables', tables: [], tfilter: '', cur: null, data: null, sqlResult: null, busy: false, lastInfo: undefined, sel: new Map(), lastPick: null };
     const q = s => root.querySelector(s);
     q('.dbv-form').addEventListener('submit', e => { e.preventDefault(); connect(st); });
     q('[data-a=detect]').addEventListener('click', () => detect(st));
@@ -107,6 +116,13 @@ window.DbView = (() => {
     q('[data-p=next]').addEventListener('click', () => { if (st.cur && st.data && st.cur.offset + PAGE < st.data.total) { st.cur.offset += PAGE; loadTable(st); } });
     q('[data-a=reload]').addEventListener('click', () => { loadTables(st); if (st.cur) loadTable(st); });
     q('[data-a=run]').addEventListener('click', () => runSql(st));
+    q('[data-a=truncate]').addEventListener('click', () => truncateTable(st));
+    q('[data-a=clearsel]').addEventListener('click', () => { st.sel.clear(); renderTable(st); });
+    q('[data-a=delsel]').addEventListener('click', () => deleteSelected(st));
+    // Entf/Rücktaste löscht die markierten Zeilen (nicht beim Tippen in einem Feld)
+    root.addEventListener('keydown', e => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && st.sel.size && st.mode === 'tables' && !e.target.closest('input, textarea')) { e.preventDefault(); deleteSelected(st); }
+    });
     q('.dbv-sql textarea').addEventListener('keydown', e => {
       if (e.key === 'Enter' && (IS_MAC ? e.metaKey : e.ctrlKey)) { e.preventDefault(); runSql(st); }
       if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertText', false, '  '); }
@@ -212,6 +228,7 @@ window.DbView = (() => {
     if (!cur) return;
     const wrap = st.root.querySelector('.dbv-tables .dbv-gridwrap');
     wrap.classList.add('loading');
+    st.sel.clear(); st.lastPick = null;
     try {
       const data = await s3db.table(st.tab.id, { ...cur, limit: PAGE });
       if (st.cur !== cur) return;
@@ -229,9 +246,30 @@ window.DbView = (() => {
     q('[data-p=prev]').disabled = !d || d.offset <= 0;
     q('[data-p=next]').disabled = !d || d.offset + d.rows.length >= d.total;
     q('.dbv-foot').textContent = d ? (d.pk.length ? t('db.editHint') : t('db.noPkHint')) : t('db.pickTable');
+    const info = cur && st.tables.find(x => x.schema === cur.schema && x.name === cur.table);
+    q('[data-a=truncate]').hidden = !d || !info || !['r', 'p'].includes(info.kind);
+    const n = st.sel.size;
+    q('.dbv-selbar').hidden = !n;
+    q('.dbv-seln').textContent = t('db.selected', { n: I18N.fmtNumber(n) });
+    q('[data-a=delsel] span').textContent = t('db.deleteSel', { n: I18N.fmtNumber(n) });
     const wrap = q('.dbv-tables .dbv-gridwrap');
     if (!d) { wrap.innerHTML = ''; return; }
+    const keyOfRow = row => JSON.stringify(row.pk);
     grid(wrap, d.columns, d.rows, {
+      offset: d.offset,
+      select: d.pk.length ? {
+        has: row => st.sel.has(keyOfRow(row)),
+        all: () => d.rows.length > 0 && d.rows.every(r => st.sel.has(keyOfRow(r))),
+        toggle: (ri, shift) => {
+          const on = !st.sel.has(keyOfRow(d.rows[ri]));
+          // Shift: alles zwischen der letzten und dieser Zeile gleich setzen
+          const [a, b] = shift && st.lastPick != null ? [Math.min(st.lastPick, ri), Math.max(st.lastPick, ri)] : [ri, ri];
+          for (let i = a; i <= b; i++) { const r = d.rows[i]; if (on) st.sel.set(keyOfRow(r), r.pk); else st.sel.delete(keyOfRow(r)); }
+          st.lastPick = ri;
+          renderTable(st);
+        },
+        toggleAll: on => { for (const r of d.rows) { if (on) st.sel.set(keyOfRow(r), r.pk); else st.sel.delete(keyOfRow(r)); } st.lastPick = null; renderTable(st); },
+      } : null,
       sort: { col: cur.orderBy, desc: cur.desc, on: col => { cur.desc = cur.orderBy === col ? !cur.desc : false; cur.orderBy = col; cur.offset = 0; loadTable(st); } },
       editable: d.pk.length > 0,
       onEdit: (row, ci, td) => editCell(st, row, ci, td),
@@ -244,18 +282,30 @@ window.DbView = (() => {
     const table = document.createElement('table');
     table.className = 'dbv-table';
     const head = document.createElement('tr');
-    head.innerHTML = '<th class="rn"></th>' + columns.map((c, i) => {
+    const sel = opts.select;
+    head.innerHTML = `<th class="rn">${sel ? `<input type="checkbox" class="dbv-check" title="${esc(t('db.selectPage'))}" ${sel.all() ? 'checked' : ''}>` : ''}</th>` + columns.map((c, i) => {
       const s = opts.sort && opts.sort.col === c.name ? (opts.sort.desc ? ' ↓' : ' ↑') : '';
       return `<th data-i="${i}" title="${esc(c.type)}"><span>${esc(c.name)}</span><small>${esc(c.type)}${s}</small></th>`;
     }).join('');
     const thead = document.createElement('thead');
     thead.appendChild(head);
     table.appendChild(thead);
+    if (sel) {
+      const all = head.querySelector('.dbv-check');
+      all.addEventListener('click', e => e.stopPropagation());
+      all.addEventListener('change', () => sel.toggleAll(all.checked));
+    }
     if (opts.sort) for (const th of head.querySelectorAll('th[data-i]')) th.addEventListener('click', () => opts.sort.on(columns[th.dataset.i].name));
     const body = document.createElement('tbody');
     rows.forEach((row, ri) => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td class="rn">${(opts.offset || 0) + ri + 1}</td>`;
+      if (sel) {
+        const on = sel.has(row);
+        tr.classList.toggle('picked', on);
+        tr.innerHTML = `<td class="rn sel"><label><input type="checkbox" class="dbv-check" ${on ? 'checked' : ''}><span>${(opts.offset || 0) + ri + 1}</span></label></td>`;
+        const box = tr.querySelector('.dbv-check');
+        box.addEventListener('click', e => { e.preventDefault(); sel.toggle(ri, e.shiftKey); });
+      } else tr.innerHTML = `<td class="rn">${(opts.offset || 0) + ri + 1}</td>`;
       row.cells.forEach((v, ci) => {
         const td = document.createElement('td');
         if (v === null) { td.className = 'null'; td.textContent = 'NULL'; }
@@ -315,7 +365,8 @@ window.DbView = (() => {
     if (d && d.pk.length) {
       entries.push([t('db.editCell'), () => { const td = e.target.closest('td'); if (td) editCell(st, row, ci, td); }, '', 'edit']);
       if (row.cells[ci] !== null) entries.push([t('db.setNull'), () => saveCell(st, row, ci, null), '', 'close']);
-      entries.push(null, [t('db.deleteRow'), () => deleteRow(st, row), 'danger', 'trash']);
+      if (st.sel.size > 1) entries.push(null, [t('db.deleteSel', { n: I18N.fmtNumber(st.sel.size) }), () => deleteSelected(st), 'danger', 'trash']);
+      else entries.push(null, [t('db.deleteRow'), () => deleteRow(st, row), 'danger', 'trash']);
     }
     openMenu(entries, e.clientX, e.clientY);
   }
@@ -332,6 +383,50 @@ window.DbView = (() => {
       await s3db.remove(st.tab.id, { schema: st.cur.schema, table: st.cur.table, pk: d.pk, pkValues: row.pk });
       await loadTable(st);
     } catch (e) { showError(t('db.deleteFailed', { error: errMsg(e) })); }
+  }
+
+  async function deleteSelected(st) {
+    const d = st.data;
+    if (!d || !d.pk.length || !st.sel.size) return;
+    const keys = [...st.sel.values()];
+    if (keys.length === 1) { const row = d.rows.find(r => JSON.stringify(r.pk) === JSON.stringify(keys[0])); if (row) return deleteRow(st, row); }
+    const sample = keys.slice(0, 8).map(k => d.pk.map((p, i) => `${p} = ${k[i]}`).join(', ')).join('\n') + (keys.length > 8 ? '\n…' : '');
+    const ok = await askLocal({
+      kind: 'confirm', title: t('db.deleteManyTitle', { n: I18N.fmtNumber(keys.length) }),
+      message: t('db.deleteManyMsg', { n: I18N.fmtNumber(keys.length), table: st.cur.table }),
+      detail: sample, okLabel: t('db.deleteOk'), danger: true, focusCancel: true,
+    });
+    if (!ok) return;
+    try {
+      await s3db.removeMany(st.tab.id, { schema: st.cur.schema, table: st.cur.table, pk: d.pk, keys });
+      await loadTable(st);
+      loadTables(st);
+    } catch (e) { showError(t('db.deleteFailed', { error: errMsg(e) })); }
+  }
+
+  // Ganze Tabelle leeren: Zeilenzahl und abhängige Tabellen zeigen, Namen eintippen lassen
+  async function truncateTable(st) {
+    const cur = st.cur;
+    if (!cur) return;
+    let info;
+    try { info = await s3db.truncateInfo(st.tab.id, { schema: cur.schema, table: cur.table }); } catch (e) { showError(errMsg(e)); return; }
+    const n = info.capped ? I18N.fmtNumber(info.rows - 1) + '+' : I18N.fmtNumber(info.rows);
+    const res = await askLocal({
+      kind: 'text', title: t('db.truncateTitle', { table: cur.table }),
+      message: t('db.truncateMsg', { table: cur.table, n }),
+      detail: info.refs.length ? t('db.truncateRefs', { table: cur.table, tables: info.refs.join('\n') }) : '',
+      placeholder: cur.table, okLabel: t('db.truncateOk'), danger: true,
+      remember: info.hasSequence, rememberLabel: t('db.truncateRestart'),
+    });
+    if (res == null) return;
+    const typed = String(typeof res === 'object' ? res.value : res).trim();
+    if (typed !== cur.table) { showError(t('db.truncateWrongName')); return; }
+    try {
+      await s3db.truncate(st.tab.id, { schema: cur.schema, table: cur.table, confirm: typed, cascade: info.refs.length > 0, restartIdentity: typeof res === 'object' && !!res.remember });
+      cur.offset = 0;
+      await loadTable(st);
+      loadTables(st);
+    } catch (e) { showError(t('db.truncateFailed', { error: errMsg(e) })); }
   }
 
   // ---------- SQL ----------
