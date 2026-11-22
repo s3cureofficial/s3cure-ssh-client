@@ -1,5 +1,6 @@
 // macOS: Installationsfenster (.dmg) mit „In Programme ziehen“ aus dem fertigen Build.
-// Aufruf: node tools/mac-dmg.mjs arm64|x64   (nach npm run build bzw. build:mac-intel)
+// Aufruf: node tools/mac-dmg.mjs arm64|x64 [Zusatz]   (nach npm run build bzw. build:mac-intel)
+//   Zusatz z. B. macOS12 -> S3cure-SSH-Client-Mac-Intel-macOS12.dmg (build:mac-intel-macos12, älteres Electron)
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -9,8 +10,9 @@ const APP_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const NAME = 'S3cure SSH Client';
 const arch = process.argv[2] === 'x64' ? 'x64' : 'arm64';
 const PREPACKAGED = path.join(APP_DIR, '..', 'dist', `${NAME}-darwin-${arch}`, `${NAME}.app`);
-const OUT = path.join(APP_DIR, '..', 'dist', `dmg-${arch}`);
-const FINAL = path.join(APP_DIR, '..', 'dist', `S3cure-SSH-Client-Mac-${arch === 'arm64' ? 'AppleSilicon' : 'Intel'}.dmg`);
+const SUFFIX = /^[A-Za-z0-9]+$/.test(process.argv[3] || '') ? process.argv[3] : '';
+const OUT = path.join(APP_DIR, '..', 'dist', `dmg-${arch}${SUFFIX}`);
+const FINAL = path.join(APP_DIR, '..', 'dist', `S3cure-SSH-Client-Mac-${arch === 'arm64' ? 'AppleSilicon' : 'Intel'}${SUFFIX ? '-' + SUFFIX : ''}.dmg`);
 const pkg = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'package.json'), 'utf8'));
 
 await build({

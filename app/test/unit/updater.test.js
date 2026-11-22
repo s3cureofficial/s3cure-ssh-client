@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { setupUpdater, isAppImage } = require('../../lib/updater');
+const { setupUpdater, isAppImage, macAssetLabel } = require('../../lib/updater');
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 's3cure-updater-'));
 process.on('exit', () => fs.rmSync(tmp, { recursive: true, force: true }));
@@ -61,4 +61,12 @@ test('isAppImage erkennt AppImage-Dateien am Dateikopf', () => {
   assert.equal(isAppImage(elf), false);
   assert.equal(isAppImage(text), false);
   assert.equal(isAppImage(path.join(tmp, 'fehlt')), false);
+});
+
+test('macAssetLabel: Intel mit macOS 12 bekommt den eigenen Build', () => {
+  assert.equal(macAssetLabel('arm64', '21.6.0'), 'AppleSilicon');
+  assert.equal(macAssetLabel('x64', '21.6.0'), 'Intel-macOS12'); // macOS 12.7.6
+  assert.equal(macAssetLabel('x64', '22.1.0'), 'Intel'); // macOS 13
+  assert.equal(macAssetLabel('x64', '25.0.0'), 'Intel');
+  assert.equal(macAssetLabel('x64', ''), 'Intel');
 });

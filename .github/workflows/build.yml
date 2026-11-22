@@ -86,6 +86,11 @@ jobs:
             script: build:mac-intel
             zip: S3cure-SSH-Client-Mac-Intel.zip
             smoke: ''
+          - name: macOS Intel (macOS 12)
+            # Eigener Build mit Electron 43 – das aktuelle Electron läuft erst ab macOS 13
+            os: macos-latest
+            script: build:mac-intel-macos12
+            smoke: ''
           - name: Windows x64
             os: windows-latest
             script: build:win
@@ -120,6 +125,15 @@ jobs:
 
       - name: Bauen
         run: npm run ${{ matrix.script }}
+
+      # macOS-12-Build: die fertige App muss wirklich ab macOS 12 starten dürfen
+      - name: Mindest-macOS prüfen (macOS-12-Build)
+        if: matrix.script == 'build:mac-intel-macos12'
+        run: |
+          MIN=$(plutil -extract LSMinimumSystemVersion raw "../dist/S3cure SSH Client-darwin-x64/S3cure SSH Client.app/Contents/Info.plist")
+          echo "LSMinimumSystemVersion: $MIN"
+          [ "${MIN%%.*}" -le 12 ] || { echo "::error::App verlangt macOS $MIN – sollte 12 sein"; exit 1; }
+          ls -la ../dist/S3cure-SSH-Client-Mac-Intel-macOS12.dmg
 
       - name: Start-Rauchtest
         if: matrix.smoke != ''

@@ -14,6 +14,11 @@ How to write a section (for contributors):
 
 ## [Unreleased]
 
+## 1.8.1 – 2026-11-22
+
+### New
+- **Version for older Intel Macs with macOS 12 (Monterey):** separate file `S3cure-SSH-Client-Mac-Intel-macOS12.dmg`. The regular Mac version now needs macOS 13. On macOS 12 the app takes its updates from this file automatically.
+
 ## 1.8.0 – 2026-11-20
 
 ### New

@@ -25,6 +25,14 @@ const { t } = i18n;
 const NAME = 'S3cure SSH Client';
 const APPIMAGE = 'S3cure-SSH-Client-Linux-x64.AppImage';
 
+// Welche Mac-Datei passt? Intel-Macs mit macOS 12 (Darwin 21) bekommen den Build mit älterem
+// Electron (…-Mac-Intel-macOS12.dmg) – das aktuelle Electron braucht macOS 13.
+function macAssetLabel(arch, darwinRelease) {
+  if (arch === 'arm64') return 'AppleSilicon';
+  const major = Number(String(darwinRelease || '').split('.')[0]);
+  return major && major < 22 ? 'Intel-macOS12' : 'Intel';
+}
+
 // Ist die Datei ein AppImage (Typ 2)? ELF-Kopf und „AI\x02“ an Stelle 8
 function isAppImage(file) {
   let fd;
@@ -58,7 +66,7 @@ function setupUpdater({ ipcMain, app, getMainWin, latestRelease, preload, platfo
     const exe = app.getPath('exe');
     if (platform === 'darwin') {
       const bundle = path.resolve(exe, '..', '..', '..');
-      const label = process.arch === 'arm64' ? 'AppleSilicon' : 'Intel';
+      const label = macAssetLabel(process.arch, os.release());
       const files = [`S3cure-SSH-Client-Mac-${label}.dmg`, `S3cure-SSH-Client-Mac-${label}.zip`];
       if (!bundle.endsWith('.app')) return { kind: 'handoff', files: [files[0]] };
       return { kind: 'mac', bundle, files, fallback: files[0] };
@@ -371,4 +379,4 @@ rm -rf "$TMP"
   return { installKind, start };
 }
 
-module.exports = { setupUpdater, isAppImage };
+module.exports = { setupUpdater, isAppImage, macAssetLabel };

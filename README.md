@@ -107,6 +107,7 @@ The app tells you about new versions itself – **one click on “Update”** do
 |---|---|---|
 | **Mac with Apple silicon** (M1–M4) | [`S3cure-SSH-Client-Mac-AppleSilicon.dmg`](https://github.com/s3cureofficial/s3cure-ssh-client/releases/latest/download/S3cure-SSH-Client-Mac-AppleSilicon.dmg) | Install window |
 | **Mac with Intel chip** | [`S3cure-SSH-Client-Mac-Intel.dmg`](https://github.com/s3cureofficial/s3cure-ssh-client/releases/latest/download/S3cure-SSH-Client-Mac-Intel.dmg) | Install window |
+| **Mac with Intel chip, macOS 12 Monterey** | [`S3cure-SSH-Client-Mac-Intel-macOS12.dmg`](https://github.com/s3cureofficial/s3cure-ssh-client/releases/latest/download/S3cure-SSH-Client-Mac-Intel-macOS12.dmg) | Install window |
 | **Windows 10/11** (64-bit) | [`S3cure-SSH-Client-Setup.exe`](https://github.com/s3cureofficial/s3cure-ssh-client/releases/latest/download/S3cure-SSH-Client-Setup.exe) | Installer with Start menu & desktop shortcut |
 | **Linux** (64-bit, x86) | [`S3cure-SSH-Client-Linux-x64.AppImage`](https://github.com/s3cureofficial/s3cure-ssh-client/releases/latest/download/S3cure-SSH-Client-Linux-x64.AppImage) | A single file – make it executable and run it |
 

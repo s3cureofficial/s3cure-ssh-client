@@ -107,6 +107,7 @@ Die App zeigt neue Versionen selbst an – **ein Klick auf „Update“** lädt,
 |---|---|---|
 | **Mac mit Apple-Chip** (M1–M4) | [`S3cure-SSH-Client-Mac-AppleSilicon.dmg`](https://github.com/s3cureofficial/s3cure-ssh-client/releases/latest/download/S3cure-SSH-Client-Mac-AppleSilicon.dmg) | Installationsfenster |
 | **Mac mit Intel-Chip** | [`S3cure-SSH-Client-Mac-Intel.dmg`](https://github.com/s3cureofficial/s3cure-ssh-client/releases/latest/download/S3cure-SSH-Client-Mac-Intel.dmg) | Installationsfenster |
+| **Mac mit Intel-Chip, macOS 12 Monterey** | [`S3cure-SSH-Client-Mac-Intel-macOS12.dmg`](https://github.com/s3cureofficial/s3cure-ssh-client/releases/latest/download/S3cure-SSH-Client-Mac-Intel-macOS12.dmg) | Installationsfenster |
 | **Windows 10/11** (64 Bit) | [`S3cure-SSH-Client-Setup.exe`](https://github.com/s3cureofficial/s3cure-ssh-client/releases/latest/download/S3cure-SSH-Client-Setup.exe) | Installer mit Startmenü & Desktop-Verknüpfung |
 | **Linux** (64 Bit, x86) | [`S3cure-SSH-Client-Linux-x64.AppImage`](https://github.com/s3cureofficial/s3cure-ssh-client/releases/latest/download/S3cure-SSH-Client-Linux-x64.AppImage) | Eine Datei – ausführbar machen und starten |
 
