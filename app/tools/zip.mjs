@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { patchApp } from './mac-uuid.mjs';
 
 export function zipDir(src, zip) {
   src = path.resolve(src);
@@ -16,6 +17,8 @@ export function zipDir(src, zip) {
     // .app neu ad-hoc signieren: Der Packager verändert das Bundle, danach passt Electrons
     // Signatur nicht mehr – heruntergeladen meldet macOS die App sonst als „beschädigt“.
     if (src.endsWith('.app')) {
+      // Eigene Programm-Kennung, sonst blockiert macOS das lokale Netzwerk wie beim Original-Electron
+      console.log('Eigene Programm-Kennung:', patchApp(src), 'Programme');
       execFileSync('codesign', ['--force', '--deep', '--sign', '-', src], opts);
       execFileSync('codesign', ['--verify', '--deep', '--strict', src], opts);
       console.log('Ad-hoc signiert:', path.basename(src));

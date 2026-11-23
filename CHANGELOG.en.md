@@ -14,6 +14,11 @@ How to write a section (for contributors):
 
 ## [Unreleased]
 
+## 1.8.3 – 2026-11-24
+
+### Fixed
+- **Mac: PS3, NAS and other devices on your own network can now really be reached.** macOS confused the app with stock Electron and blocked it even with access turned on. The app now has its own program ID. After the update, click “Allow” once on the first connection.
+
 ## 1.8.2 – 2026-11-24
 
 ### Fixed

@@ -14,6 +14,11 @@ So wird ein Abschnitt geschrieben (für Mitwirkende):
 
 ## [Unveröffentlicht]
 
+## 1.8.3 – 2026-11-24
+
+### Behoben
+- **Mac: PS3, NAS und andere Geräte im eigenen Netzwerk sind jetzt wirklich erreichbar.** macOS hat die App mit dem Original-Electron verwechselt und sie trotz eingeschalteter Freigabe blockiert. Die App hat jetzt eine eigene Programm-Kennung. Beim ersten Verbinden nach dem Update einmal auf „Erlauben“ klicken.
+
 ## 1.8.2 – 2026-11-24
 
 ### Behoben
