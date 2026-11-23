@@ -14,6 +14,8 @@ So wird ein Abschnitt geschrieben (für Mitwirkende):
 
 ## [Unveröffentlicht]
 
+## 1.8.2 – 2026-11-24
+
 ### Behoben
 - **Mac: Geräte im eigenen Netzwerk sind wieder erreichbar.** Verbindungen zu Geräten wie NAS, Raspberry Pi oder Spielkonsole scheiterten mit „nicht erreichbar“, weil macOS die App nicht nach der Freigabe fürs lokale Netzwerk gefragt hat. Jetzt erscheint die Frage beim ersten Verbinden, dort auf „Erlauben“ klicken.
 

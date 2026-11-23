@@ -14,6 +14,8 @@ How to write a section (for contributors):
 
 ## [Unreleased]
 
+## 1.8.2 – 2026-11-24
+
 ### Fixed
 - **Mac: devices on your own network can be reached again.** Connections to devices like a NAS, Raspberry Pi or game console failed with “not reachable” because macOS never asked the app for local network access. The question now appears on the first connection, just click “Allow”.
 
